@@ -245,8 +245,16 @@ export default class DictionaryProvider extends ProviderContract {
         continue
       }
 
-      this._loadedDicts.push(dict)
-      this.hunspell.push(new Nodehun(aff, dic))
+      // The native addon may be unavailable: it cannot be built on every
+      // system. A dictionary that cannot be opened is simply not checked.
+      try {
+        this._loadedDicts.push(dict)
+        this.hunspell.push(new Nodehun(aff, dic))
+      } catch (err: any) {
+        this._loadedDicts.pop()
+        this._logger.error(`[Dictionary Provider] Could not open dictionary ${dict}`, err)
+        continue
+      }
     } // END for
 
     if (changeWanted) {

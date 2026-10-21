@@ -34,7 +34,8 @@ import type { SearchResult, SearchTerm } from '@dts/common/search'
 import ProviderContract from '@providers/provider-contract'
 import { app, ipcMain } from 'electron'
 import type LogProvider from '@providers/log'
-import { hasMarkdownExt, hasCodeExt } from '@common/util/file-extention-checks'
+import { hasMarkdownExt, hasCodeExt, hasIcprojExt } from '@common/util/file-extention-checks'
+import { circuitProjectStem } from '@common/util/circuit-project'
 import getMarkdownFileParser from './util/file-parser'
 import type ConfigProvider from '@providers/config'
 import { promises as fs, constants as FS_CONSTANTS, type Stats } from 'fs'
@@ -415,7 +416,7 @@ export default class FSAL extends ProviderContract {
    *
    * @param  {string}  query  What to search for
    */
-  public async findExact (query: string): Promise<MDFileDescriptor|undefined> {
+  public async findExact (query: string): Promise<MDFileDescriptor|CodeFileDescriptor|undefined> {
     const allFileDescriptors = (await this.getAllLoadedDescriptors())
       .filter(descriptor => descriptor.type === 'file')
 
@@ -433,6 +434,36 @@ export default class FSAL extends ProviderContract {
       }
 
       if (descriptor.name === query + descriptor.ext) {
+        return descriptor
+      }
+    }
+
+    return await this.findCircuitProject(query)
+  }
+
+  /**
+   * Searches for a circuit drawing.
+   *
+   * A drawing is not a Markdown file, so it has no ID and no tags. It is
+   * found by its name instead: `inv` and `inv.icproj.json` both name the
+   * drawing `inv.icproj.json`.
+   *
+   * @param  {string}  query  What to search for
+   */
+  public async findCircuitProject (query: string): Promise<CodeFileDescriptor|undefined> {
+    const wanted = query.toLowerCase()
+    const descriptors = (await this.getAllLoadedDescriptors())
+      .filter(descriptor => descriptor.type === 'code')
+
+    for (const descriptor of descriptors) {
+      if (!hasIcprojExt(descriptor.path)) {
+        continue
+      }
+      if (descriptor.name.toLowerCase() === wanted) {
+        return descriptor
+      }
+      const stem = circuitProjectStem(descriptor.name)
+      if (stem !== null && stem.toLowerCase() === wanted) {
         return descriptor
       }
     }

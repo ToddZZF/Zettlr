@@ -311,3 +311,40 @@ body.dark {
     border: none;
   }
 }
+
+/* An embedded circuit drawing. The drawing itself is a figure, so it reads
+ * like any other figure in the note. */
+.circuit-embed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 1em 0;
+  padding: 0;
+}
+
+.circuit-embed-drawing {
+  max-width: 100%;
+  overflow-x: auto;
+  background-color: white;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.5em;
+}
+
+.circuit-embed-drawing svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.circuit-embed-drawing.circuit-embed-missing {
+  color: var(--zettlr-editor-error-color, red);
+  font-style: italic;
+  border-style: dashed;
+}
+
+.circuit-embed figcaption {
+  font-size: 0.8em;
+  color: var(--grey-dark);
+  padding-top: 0.3em;
+}

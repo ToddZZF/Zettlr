@@ -1,5 +1,6 @@
 const CopyWebpackPlugin = require('copy-webpack-plugin')
 const { DefinePlugin } = require('webpack')
+const fs = require('fs')
 const path = require('path')
 const rules = require('./webpack.rules')
 
@@ -12,6 +13,22 @@ if (process.env.BUNDLE_FSEVENTS !== '1') {
   // forge since that runs before this module is required and has access to the
   // *target* platform (rather than process.platform)
   externals.fsevents = "require('fsevents')"
+}
+
+// The spell checker is a native addon, and a native addon cannot be part of
+// a bundle: it has to be built for the runtime it is loaded into. Where it
+// could not be built, the spell checker stays quiet and the rest of the
+// application works as usual.
+const nodehunBinary = path.join(__dirname, 'node_modules', 'nodehun', 'build', 'Release', 'Nodehun.node')
+const alias = {
+  source: [path.resolve(__dirname, 'source')],
+  '@common': [path.resolve(__dirname, 'source/common')],
+  '@providers': [path.resolve(__dirname, 'source/app/service-providers')],
+  '@dts': [path.resolve(__dirname, 'source/types')]
+}
+
+if (!fs.existsSync(nodehunBinary)) {
+  alias['nodehun/build/Release/Nodehun.node'] = false
 }
 
 module.exports = {
@@ -44,12 +61,7 @@ module.exports = {
   ],
   resolve: {
     extensions: [ '.js', '.ts', '.jsx', '.tsx', '.css', '.json' ],
-    alias: {
-      source: [path.resolve(__dirname, 'source')],
-      '@common': [path.resolve(__dirname, 'source/common')],
-      '@providers': [path.resolve(__dirname, 'source/app/service-providers')],
-      '@dts': [path.resolve(__dirname, 'source/types')]
-    }
+    alias
   },
   externals
 }

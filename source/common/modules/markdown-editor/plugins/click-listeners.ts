@@ -17,6 +17,7 @@ import { syntaxTree } from '@codemirror/language'
 import type { DOMEventHandlers } from '@codemirror/view'
 import type { SyntaxNode } from '@lezer/common'
 import openMarkdownLink from '../util/open-markdown-link'
+import { configField } from '../util/configuration'
 
 export interface ClickListenerCallbacks {
   onWikiLink?: (url: string) => void
@@ -66,7 +67,16 @@ export function clickListeners<T = unknown> (callbacks?: ClickListenerCallbacks)
         // In these cases, nodeAt.parent is always a ZettelkastenLink
         const contentNode = nodeAt.parent?.getChild('ZknLinkContent')
         if (contentNode != null) {
-          const linkContents = view.state.sliceDoc(contentNode.from, contentNode.to)
+          let linkContents = view.state.sliceDoc(contentNode.from, contentNode.to)
+          // The title may name a part of the target — a region of a drawing,
+          // for instance — so it travels with the link. This only applies to
+          // the `link|title` format, where the title follows the target; in
+          // the other format the title is the alias.
+          const { zknLinkFormat } = view.state.field(configField)
+          const titleNode = nodeAt.parent?.getChild('ZknLinkTitle')
+          if (titleNode != null && zknLinkFormat === 'link|title') {
+            linkContents += '|' + view.state.sliceDoc(titleNode.from, titleNode.to)
+          }
           callbacks?.onWikiLink?.(linkContents)
         }
         return true

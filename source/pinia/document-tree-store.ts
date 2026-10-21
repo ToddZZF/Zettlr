@@ -183,6 +183,13 @@ export const useDocumentTreeStore = defineStore('document-tree', () => {
   const lastLeafId = ref<undefined|string>(undefined)
   const lastLeafActiveFile = ref<OpenDocument|undefined>(undefined)
 
+  /**
+   * The region of a circuit drawing a link pointed at, by path. A drawing
+   * opens framed on that region; the drawing itself keeps no memory of it,
+   * so this lives only as long as the window does.
+   */
+  const circuitFocusTargets = ref<Map<string, string>>(new Map())
+
   // Initial update for the pane structure ...
   if (windowId !== null) {
     ipcRenderer.invoke('documents-provider', { command: 'retrieve-tab-config', payload: { windowId } } as DocumentManagerIPCAPI)
@@ -206,6 +213,12 @@ export const useDocumentTreeStore = defineStore('document-tree', () => {
       // We only tend to events that pertain this window
       if (context.windowId !== windowId) {
         return // None of our business
+      }
+
+      // A link may point at a region of a circuit drawing. The drawing
+      // opens framed on that region.
+      if (context.focus !== undefined && context.filePath !== undefined) {
+        circuitFocusTargets.value.set(context.filePath, context.focus)
       }
 
       // Something in the document status has changed, here we simply pull in
@@ -275,5 +288,5 @@ export const useDocumentTreeStore = defineStore('document-tree', () => {
     }
   })
 
-  return { paneStructure, paneData, modifiedDocuments, lastLeafId, lastLeafActiveFile }
+  return { paneStructure, paneData, modifiedDocuments, lastLeafId, lastLeafActiveFile, circuitFocusTargets }
 })

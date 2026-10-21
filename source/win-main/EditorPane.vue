@@ -41,6 +41,14 @@
             v-bind:window-id="windowId"
             v-bind:editor-commands="editorCommands"
           ></PDFViewer>
+          <CircuitViewer
+            v-else-if="hasIcprojExt(activeFileDescriptor.path)"
+            v-bind:file="activeFileDescriptor"
+            v-bind:leaf-id="leafId"
+            v-bind:active-file="activeFile"
+            v-bind:window-id="windowId"
+            v-bind:editor-commands="editorCommands"
+          ></CircuitViewer>
           <MainEditor
             v-else
             v-bind:file="activeFileDescriptor"
@@ -137,8 +145,9 @@ import DocumentTabs from './DocumentTabs.vue'
 import MainEditor from './MainEditor.vue'
 import { useDocumentTreeStore, useWindowStateStore } from 'source/pinia'
 import ImageViewer from './file-viewers/ImageViewer.vue'
-import { hasImageExt, hasPDFExt } from '@common/util/file-extention-checks'
+import { hasImageExt, hasPDFExt, hasIcprojExt } from '@common/util/file-extention-checks'
 import PDFViewer from './file-viewers/PDFViewer.vue'
+import CircuitViewer from './file-viewers/CircuitViewer.vue'
 import type { DocumentManagerIPCAPI } from 'source/app/service-providers/documents'
 import { type EditorViewPersistentState } from 'source/common/modules/markdown-editor'
 

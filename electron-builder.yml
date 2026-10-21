@@ -25,9 +25,14 @@ fileAssociations:
   mimeType: text/markdown
   role: Editor
   isPackage: false
+- ext: icproj.json
+  name: CircuitDrawing
+  description: Analog-Canvas circuit drawing
+  mimeType: application/json
+  role: Editor
+  isPackage: false
 directories:
   output: release
-#
 # Generic macOS options
 #
 mac:

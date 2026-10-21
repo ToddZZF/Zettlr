@@ -37,7 +37,8 @@ import MarkdownEditor, { type EditorViewPersistentState } from '@common/modules/
 
 import { ref, computed, onMounted, onBeforeUnmount, watch, toRef, onUpdated } from 'vue'
 import { type EditorCommands } from './App.vue'
-import { hasMarkdownExt } from '@common/util/file-extention-checks'
+import { hasMarkdownExt, hasIcprojExt } from '@common/util/file-extention-checks'
+import { circuitProjectStem } from '@common/util/circuit-project'
 import { DP_EVENTS, type OpenDocument } from '@dts/common/documents'
 import { CITEPROC_MAIN_DB } from '@dts/common/citeproc'
 import { type EditorConfigOptions } from '@common/modules/markdown-editor/util/configuration'
@@ -435,6 +436,14 @@ const fsalFiles = computed<MDFileDescriptor[]>(() => {
   return [...workspaceStore.descriptorMap.values()].filter(d => d.type === 'file')
 })
 
+/**
+ * The circuit drawings in the workspace. A drawing is a note of its own
+ * kind, so it belongs in the list of things a link may point at.
+ */
+const circuitDrawings = computed<CodeFileDescriptor[]>(() => {
+  return [...workspaceStore.descriptorMap.values()].filter((d): d is CodeFileDescriptor => d.type === 'code' && hasIcprojExt(d.path))
+})
+
 // WATCHERS
 watch(useH1, () => { updateFileDatabase().catch(err => console.error('Could not update file database', err)) })
 watch(useTitle, () => { updateFileDatabase().catch(err => console.error('Could not update file database', err)) })
@@ -643,6 +652,15 @@ async function updateFileDatabase (): Promise<void> {
       filename: pathBasename(file.name, file.ext),
       displayName: getDocumentTitle(file),
       id: file.id
+    })
+  }
+
+  // ... and the drawings, which are named without their project extension ...
+  for (const drawing of circuitDrawings.value) {
+    fileDatabase.push({
+      filename: circuitProjectStem(drawing.name) ?? drawing.name,
+      displayName: drawing.name,
+      id: ''
     })
   }
 

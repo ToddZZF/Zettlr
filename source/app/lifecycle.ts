@@ -15,6 +15,7 @@
 
 // Helper/Utility functions
 import registerCustomProtocols from './util/custom-protocols'
+import { registerCircuitProtocol } from './util/circuit-protocol'
 import environmentCheck from './util/environment-check'
 import addToPath from './util/add-to-PATH'
 import resolveTimespanMs from './util/resolve-timespan-ms'
@@ -64,6 +65,7 @@ export async function bootApplication (): Promise<AppServiceContainer> {
   }
 
   registerCustomProtocols(log)
+  registerCircuitProtocol(log)
 
   // Prevent navigation away from our main windows and the creation of arbitrary
   // browser windows with external URLs

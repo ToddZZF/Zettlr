@@ -58,6 +58,11 @@ export interface DocumentsUpdateContext {
   originLeaf?: string
   key?: string
   status?: 'modification'|'pinned'
+  /**
+   * The region of a circuit drawing a link pointed at. The drawing opens
+   * framed on that region instead of on the whole sheet.
+   */
+  focus?: string
 }
 
 /**
@@ -138,7 +143,7 @@ export type DocumentManagerIPCAPI = IPCAPI<{
   'set-pinned': LeafLoc & { path: string, pinned: boolean }
   'retrieve-tab-config': { windowId: string }
   'save-file': { path: string }
-  'open-file': LeafLoc & { path: string, newTab: boolean }
+  'open-file': LeafLoc & { path: string, newTab: boolean, focus?: string }
   'close-file': LeafLoc & { path: string }
   'close-file-everywhere': { path: string }
   'get-open-workspace-files': { path: string }
@@ -297,8 +302,8 @@ export default class DocumentManager extends ProviderContract {
           return await this.saveFile(payload.path)
         }
         case 'open-file': {
-          const { windowId, leafId, path, newTab } = payload
-          return await this.openFile(windowId, leafId, path, newTab)
+          const { windowId, leafId, path, newTab, focus } = payload
+          return await this.openFile(windowId, leafId, path, newTab, focus)
         }
         case 'close-file': {
           const { windowId, leafId, path } = payload
@@ -792,10 +797,11 @@ current contents from the editor somewhere else, and restart the application.`
    * @param  {string|undefined} leafId    The leafId of the window to open the document in
    * @param  {string}  filePath   The absolute file path
    * @param  {boolean} newTab Optional. If true, will always prevent exchanging the currently active file.
+   * @param  {string}  focus    Optional. The region of a circuit drawing to open the file on.
    *
    * @return {Promise<boolean>} True if it successfully opens the file
    */
-  public async openFile (windowId: string|undefined, leafId: string|undefined, filePath: string, newTab?: boolean): Promise<boolean> {
+  public async openFile (windowId: string|undefined, leafId: string|undefined, filePath: string, newTab?: boolean, focus?: string): Promise<boolean> {
     if (!isFile(filePath)) {
       // The renderer process essentially just throws paths at the documents
       // provider when the user intents to open them. Users can also link
@@ -884,7 +890,7 @@ current contents from the editor somewhere else, and restart the application.`
       // File is already open -> simply set it as active
       // leaf.tabMan.activeFile = filePath
       leaf.tabMan.openFile(filePath)
-      this.broadcastEvent(DP_EVENTS.ACTIVE_FILE, { windowId, leafId, filePath })
+      this.broadcastEvent(DP_EVENTS.ACTIVE_FILE, { windowId, leafId, filePath, focus })
       this.syncToConfig()
       return true
     }
@@ -895,7 +901,7 @@ current contents from the editor somewhere else, and restart the application.`
     const activeFile = leaf.tabMan.activeFile
     const ret = leaf.tabMan.openFile(filePath)
     if (ret) {
-      this.broadcastEvent(DP_EVENTS.OPEN_FILE, { windowId, leafId, filePath })
+      this.broadcastEvent(DP_EVENTS.OPEN_FILE, { windowId, leafId, filePath, focus })
     }
 
     // Close the (formerly active) file if we should avoid new tabs and have not
@@ -907,7 +913,7 @@ current contents from the editor somewhere else, and restart the application.`
       this.broadcastEvent(DP_EVENTS.CLOSE_FILE, { windowId, leafId, filePath: activeFile.path })
     }
 
-    this.broadcastEvent(DP_EVENTS.ACTIVE_FILE, { windowId, leafId, filePath: leaf.tabMan.activeFile?.path })
+    this.broadcastEvent(DP_EVENTS.ACTIVE_FILE, { windowId, leafId, filePath: leaf.tabMan.activeFile?.path, focus })
     await this.synchronizeDatabases()
     this.syncToConfig()
     return ret

@@ -46,6 +46,10 @@ export const customTags = {
   ZknLinkContent: Tag.define(),
   ZknLinkTitle: Tag.define(),
   ZknLinkPipe: Tag.define(tags.processingInstruction),
+  // Zettelkasten embeds: ![[link]]
+  ZknEmbed: Tag.define(),
+  ZknEmbedMark: Tag.define(),
+  ZknEmbedContent: Tag.define(),
   // Zettelkasten tags: #my-tag
   ZknTag: Tag.define(),
   ZknTagMark: Tag.define(),

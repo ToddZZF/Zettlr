@@ -14,6 +14,8 @@
  */
 
 import type { AppServiceContainer } from 'source/app/app-service-container'
+import { hasIcprojExt } from '@common/util/file-extention-checks'
+import { parseLinkTarget } from '@common/util/circuit-project'
 import ZettlrCommand from './zettlr-command'
 
 export interface ForceOpenAPI {
@@ -21,6 +23,15 @@ export interface ForceOpenAPI {
   leafId?: string
   linkContents: string
   newTab?: boolean
+}
+
+/**
+ * What a link pointed at. A circuit drawing may name one of its regions, in
+ * which case the drawing opens framed on that region.
+ */
+export interface ForceOpenResult {
+  path?: string
+  region?: string
 }
 
 export default class ForceOpen extends ZettlrCommand {
@@ -33,9 +44,9 @@ export default class ForceOpen extends ZettlrCommand {
     *
     * @param   {string}        evt      The event name
     * @param   {ForceOpenAPI}  payload  the parameters of the file to be opened
-    * @return  {boolean}                Whether the file was successfully opened.
+    * @return  {ForceOpenResult}         What the link pointed at.
     */
-  async run (evt: string, payload: ForceOpenAPI): Promise<void> {
+  async run (evt: string, payload: ForceOpenAPI): Promise<ForceOpenResult> {
     let { windowId, linkContents, newTab, leafId } = payload
 
     if (windowId === undefined) {
@@ -47,18 +58,29 @@ export default class ForceOpen extends ZettlrCommand {
     // command.
     const { customDirectory } = this._app.config.get().zkn
 
-    const filename = linkContents.includes('#') ? linkContents.slice(0, linkContents.indexOf('#')) : linkContents
+    // A link may point at a part of a file: everything after the first hash
+    // names that part. For a circuit drawing it names a region of the
+    // drawing.
+    const { filename, region } = parseLinkTarget(linkContents)
 
     const file = await this._app.fsal.findExact(filename)
 
     // Now we have a file (if not, create a new one if the user wishes so)
     if (file !== undefined) {
-      await this._app.documents.openFile(windowId, leafId, file.path, newTab)
+      // Only a drawing knows regions. A Markdown link that names a heading
+      // keeps its old behaviour: the file opens at the top.
+      const focus = region !== undefined && region.length > 0 && hasIcprojExt(file.path)
+        ? region
+        : undefined
+      await this._app.documents.openFile(windowId, leafId, file.path, newTab, focus)
+      return { path: file.path, region: focus }
     } else if (await this._app.fsal.isDir(customDirectory)) {
       // Call the file-new command on the application, which'll do all
       // necessary steps for us.
       await this._app.commands.run('file-new', { windowId, leafId, name: linkContents, path: customDirectory })
     }
+
+    return {}
   }
 }
 

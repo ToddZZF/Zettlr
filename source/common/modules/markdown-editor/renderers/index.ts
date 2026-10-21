@@ -35,6 +35,7 @@ import { renderHorizontalRules } from './render-hr'
 import { renderBlockquotes } from './render-blockquotes'
 import { renderAdmonitions } from './render-admonitions'
 import { renderRawAdmonitions } from '../plugins/admonitions-raw'
+import { renderCircuitEmbeds } from './render-circuit-embeds'
 
 const renderCompartment = new Compartment()
 
@@ -68,6 +69,7 @@ function configureRenderers (config: Partial<EditorConfiguration>, ext?: Extensi
   updateExtension(renderCitations, isPreview && config.renderCitations, ext)
   updateExtension(renderTables, isPreview && config.renderTables, ext)
   updateExtension(renderIframes, isPreview && config.renderIframes, ext)
+  updateExtension(renderCircuitEmbeds, isPreview, ext)
   updateExtension(renderEmphasis, isPreview && config.renderEmphasis, ext)
   updateExtension(renderBlockquotes, isPreview && config.renderEmphasis, ext)
   updateExtension(renderPandoc, isPreview && config.renderPandoc, ext)

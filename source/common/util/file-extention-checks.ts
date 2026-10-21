@@ -26,6 +26,12 @@ export const PDF_EXT = ['.pdf']
 export const MS_OFFICE_EXT = [ '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx' ]
 export const OPEN_OFFICE_EXT = [ '.odt', '.ods', '.odp' ]
 export const DATA_EXT = [ '.csv', '.tsv', '.sav', '.zsav' ]
+/**
+ * Circuit drawings. The double extension is deliberate: a drawing is a
+ * project file, not a plain JSON document, and its own extension is what
+ * tells the application that it can be opened, edited and embedded.
+ */
+export const ICPROJ_EXT = ['.icproj.json']
 
 const ALL_EXT = [
   ...MD_EXT,
@@ -137,6 +143,20 @@ export function hasOpenOfficeExt (filePath: string): boolean {
  */
 export function hasDataExt (filePath: string): boolean {
   return hasExt(filePath, DATA_EXT)
+}
+
+/**
+ * Is this a circuit drawing?
+ *
+ * The check has to come before any `.json` check, since a drawing ends in
+ * `.json` as well.
+ *
+ * @param   {string}   filePath  The path to check
+ *
+ * @return  {boolean}            Whether the file is a circuit drawing.
+ */
+export function hasIcprojExt (filePath: string): boolean {
+  return hasExt(filePath, ICPROJ_EXT)
 }
 
 /**

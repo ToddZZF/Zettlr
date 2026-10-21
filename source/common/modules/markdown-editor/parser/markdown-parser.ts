@@ -94,6 +94,7 @@ import { type ZknLinkParserConfig, zknLinkParser } from './zkn-link-parser'
 import { pandocAttributesParser } from './pandoc-attributes-parser'
 import { highlightParser } from './highlight-parser'
 import { zknTagParser } from './zkn-tag-parser'
+import { zknEmbedParser } from './zkn-embed-parser'
 import { pandocDivComposite, pandocDivParser, pandocSpanParser } from './pandoc-div-span-parser'
 import { admonitionComposite, admonitionParser } from './admonition-parser'
 
@@ -246,6 +247,7 @@ export default function markdownParser (config?: MarkdownParserConfig): Language
         footnoteParser,
         citationParser,
         zknLinkParser(config?.zknLinkParserConfig),
+        zknEmbedParser,
         zknTagParser,
         pandocLinkParser,
         pandocAttributesParser,
@@ -293,6 +295,9 @@ export default function markdownParser (config?: MarkdownParserConfig): Language
         { name: 'ZknLinkContent', style: customTags.ZknLinkContent },
         { name: 'ZknLinkTitle', style: customTags.ZknLinkTitle },
         { name: 'ZknLinkPipe', style: customTags.ZknLinkPipe },
+        { name: 'ZknEmbed', style: { 'ZknEmbed/...': customTags.ZknEmbed } },
+        { name: 'ZknEmbedMark', style: customTags.ZknEmbedMark },
+        { name: 'ZknEmbedContent', style: customTags.ZknEmbedContent },
         { name: 'ZknTag', style: { 'ZknTag/...': customTags.ZknTag } },
         { name: 'ZknTagMark', style: customTags.ZknTagMark },
         // Pandoc attributes

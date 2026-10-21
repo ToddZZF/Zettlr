@@ -52,6 +52,15 @@ async function filePreviewTooltip (view: EditorView, pos: number, side: 1 | -1):
 
   const { zknLinkFormat } = view.state.field(configField)
 
+  // The title may name a part of the target — a region of a drawing, for
+  // instance — so it travels with the link when it is opened. This only
+  // applies to the `link|title` format, where the title follows the target;
+  // in the other format the title is the alias.
+  const titleNode = wrapperNode?.getChild('ZknLinkTitle')
+  const linkContents = titleNode != null && zknLinkFormat === 'link|title'
+    ? fileToDisplay + '|' + view.state.sliceDoc(titleNode.from, titleNode.to)
+    : fileToDisplay
+
   // By annotating a range (providing `end`) the hover tooltip will stay as long
   // as the user is somewhere over the links
   return {
@@ -60,7 +69,7 @@ async function filePreviewTooltip (view: EditorView, pos: number, side: 1 | -1):
     above: true,
     create (_view) {
       if (res !== undefined) {
-        return { dom: getPreviewElement(res, fileToDisplay, zknLinkFormat) }
+        return { dom: getPreviewElement(res, linkContents, zknLinkFormat) }
       } else {
         const dom = document.createElement('div')
         const filename = fileToDisplay.includes('#') ? fileToDisplay.slice(0, fileToDisplay.indexOf('#')) : fileToDisplay

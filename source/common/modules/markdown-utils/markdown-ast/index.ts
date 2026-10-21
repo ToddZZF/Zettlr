@@ -39,6 +39,7 @@ import { genericTextNode } from './generic-text-node'
 import { parseChildren } from './parse-children'
 import { nodeToCiteItem, type Citation } from '../../markdown-editor/parser/citation-parser'
 import { parsePandocAttributes } from 'source/common/pandoc-util/parse-pandoc-attributes'
+import { parseLinkTarget } from '@common/util/circuit-project'
 
 /**
  * Basic info every ASTNode needs to provide
@@ -442,6 +443,25 @@ export interface ZettelkastenLink extends MDNode {
 }
 
 /**
+ * Represents an embedded drawing (`![[inv.icproj.json]]`)
+ */
+export interface ZettelkastenEmbed extends MDNode {
+  type: 'ZettelkastenEmbed'
+  /**
+   * The name of the drawing, without its extension.
+   */
+  target: string
+  /**
+   * The region of the drawing the embed shows, if it names one.
+   */
+  region?: string
+  /**
+   * The from:to positions of the target range.
+   */
+  targetRange: { from: number, to: number }
+}
+
+/**
  * Represents a tag (`#some-tag`)
  */
 export interface ZettelkastenTag extends MDNode {
@@ -547,7 +567,7 @@ export type ASTNode = Document | Comment | Footnote | FootnoteRef | FootnoteRefL
 | LinkOrImage | TextNode | Heading | CitationNode | Highlight | Superscript
 | Subscript | OrderedList | BulletList | ListItem | GenericNode | FencedCode
 | InlineCode | YAMLFrontmatter | Emphasis | Strikethrough | Table | TableCell | TableRow
-| ZettelkastenLink | ZettelkastenTag | PandocDiv | PandocSpan | Admonition | AdmonitionTitle
+| ZettelkastenLink | ZettelkastenEmbed | ZettelkastenTag | PandocDiv | PandocSpan | Admonition | AdmonitionTitle
 /**
  * Extract the "type" properties from the ASTNodes that can differentiate these.
  */
@@ -1109,6 +1129,27 @@ export function parseNode (node: SyntaxNode, markdown: string): ASTNode {
         astNode.title = genericTextNode(title.from, title.to, markdown.substring(title.from, title.to))
       }
 
+      return astNode
+    }
+    case 'ZknEmbed': {
+      const content = node.getChild('ZknEmbedContent')
+      if (content === null) {
+        throw new Error('Could not parse node ZknEmbed: No ZknEmbedContent node found within children!')
+      }
+      // An embed may name a region of the drawing: `![[inv.icproj.json|#Bias]]`.
+      const raw = markdown.substring(content.from, content.to)
+      const { filename: target, region } = parseLinkTarget(raw)
+      const astNode: ZettelkastenEmbed = {
+        type: 'ZettelkastenEmbed',
+        name: 'ZknEmbed',
+        attributes: {},
+        from: node.from,
+        to: node.to,
+        whitespaceBefore: getWhitespaceBeforeNode(node, markdown),
+        target,
+        targetRange: { from: content.from, to: content.to },
+        region
+      }
       return astNode
     }
     case 'ZknTag': {

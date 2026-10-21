@@ -14,8 +14,9 @@
  */
 
 import extractYamlFrontmatter from '@common/util/extract-yaml-frontmatter'
+import { parseLinkTarget } from '@common/util/circuit-project'
 import ZettlrCommand from './zettlr-command'
-import type { MDFileDescriptor } from '@dts/common/fsal'
+import type { MDFileDescriptor, CodeFileDescriptor } from '@dts/common/fsal'
 import type { AppServiceContainer } from 'source/app/app-service-container'
 
 const MAX_FILE_PREVIEW_LENGTH = 300
@@ -53,9 +54,10 @@ export default class FilePathFindMetaData extends ZettlrCommand {
    *
    * @return  {MDFileDescriptor|undefined|string[]} Returns a MetaDescriptor, undefined, or an array
    */
-  async run (evt: string, arg: string): Promise<MDFileDescriptor|undefined|FindFileAndReturnMetadataResult> {
-    // The filename can contain a `#`, indicating a specified heading in the target file
-    const filename = arg.includes('#') ? arg.slice(0, arg.indexOf('#')) : arg
+  async run (evt: string, arg: string): Promise<MDFileDescriptor|CodeFileDescriptor|undefined|FindFileAndReturnMetadataResult> {
+    // The filename can contain a `#`, indicating a specified heading in the
+    // target file, and a `|`, indicating a region of a drawing.
+    const { filename } = parseLinkTarget(arg)
     // Quick'n'dirty command to return the Meta descriptor for the given query
     const descriptor = await this._app.fsal.findExact(filename)
     if (descriptor === undefined) {
@@ -64,6 +66,18 @@ export default class FilePathFindMetaData extends ZettlrCommand {
 
     if (evt === 'find-exact') {
       return descriptor
+    }
+
+    // A circuit drawing is not a note, so it has no preview and no word
+    // count. It still has a name and a path.
+    if (descriptor.type === 'code') {
+      return {
+        title: descriptor.name,
+        filePath: descriptor.path,
+        previewMarkdown: '',
+        wordCount: 0,
+        modtime: descriptor.modtime
+      }
     }
 
     const markdown = await this._app.fsal.loadAnySupportedFile(descriptor.path)

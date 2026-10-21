@@ -16,6 +16,7 @@
 import { app } from 'electron'
 import path from 'path'
 import { bootApplication, shutdownApplication } from './app/lifecycle'
+import { registerCircuitScheme } from './app/util/circuit-protocol'
 
 // Helper function to extract files to open from process.argv
 import extractFilesFromArgv from './app/util/extract-files-from-argv'
@@ -28,6 +29,10 @@ import {
 import { getAppServiceContainer, isAppServiceContainerReady } from './app/app-service-container'
 
 handleExitArguments()
+
+// The circuit editor is served from its own scheme, so Chromium has to know
+// about that scheme before it starts.
+registerCircuitScheme()
 
 // Immediately after launch, check if there is already another instance of
 // Zettlr running, and, if so, exit immediately. The arguments (including files)

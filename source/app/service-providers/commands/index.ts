@@ -53,8 +53,10 @@ import enumLangFiles from '@common/util/enum-lang-files'
 import enumDictFiles from '@common/util/enum-dict-files'
 import RenameTag from './rename-tag'
 import WorkspaceSort from './ws-sort'
+import CircuitProject from './circuit-project'
 
 export const commands = [
+  CircuitProject,
   DirDelete,
   DirNewProject,
   DirNew,

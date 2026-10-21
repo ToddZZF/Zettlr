@@ -99,6 +99,17 @@ module.exports = {
       // build was based off on.
       process.env.GIT_COMMIT_HASH = await getGitHash()
 
+      // The circuit editor is a small application of its own that the
+      // application embeds. It is not part of the webpack bundle, so it
+      // travels along as an extra resource, next to Pandoc.
+      const circuitBundle = path.join(__dirname, './circuit')
+      try {
+        await fs.lstat(circuitBundle)
+        forgeConfig.packagerConfig.extraResource.push(circuitBundle)
+      } catch (err) {
+        console.warn(`No circuit editor bundle at ${circuitBundle} -- drawings cannot be opened. Run "pnpm --filter @icm/editor build:zettlr" in the Analog-Canvas repository and copy the result.`)
+      }
+
       // Second, we need to make sure we can bundle Pandoc.
       if (process.env.BUNDLE_PANDOC === '0') {
         console.warn('Detected environment variable BUNDLE_PANDOC -- this build will not be bundled with Pandoc!')
@@ -191,7 +202,12 @@ module.exports = {
   rebuildConfig: {
     // Since we must build native modules for both x64 as well as arm64, we have
     // to explicitly build it everytime for the correct architecture
-    force: false // NOTE: By now covered by the global flag on packaging.
+    force: false, // NOTE: By now covered by the global flag on packaging.
+    // The spell checker is the only native module Zettlr ships. It has no
+    // prebuilt binaries and needs a C++ toolchain to compile, so on machines
+    // without one it is left alone; the dictionary provider then simply has
+    // no dictionaries to offer.
+    ignoreModules: [ 'nodehun' ]
   },
   packagerConfig: {
     appBundleId: 'com.zettlr.app',
@@ -252,6 +268,14 @@ module.exports = {
       name: '@electron-forge/plugin-webpack',
       config: {
         mainConfig: './webpack.main.config.js',
+        // The native modules are rebuilt before the bundles are built. The
+        // spell checker cannot be compiled without a C++ toolchain, so it is
+        // skipped; the application runs without a spell checker rather than
+        // not at all.
+        rebuildConfig: {
+          force: false,
+          ignoreModules: [ 'nodehun' ]
+        },
         // Since electron-forge v6.0.0-beta.58, this property controls the CSP
         // for the development process. Since the defaults by electron-forge are
         // not suitable for our needs (since they prevent the usage of our

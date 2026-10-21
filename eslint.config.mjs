@@ -19,6 +19,10 @@ export default defineConfig([
       'resources/**/*.js',
       // Ignore all generated code
       '.webpack/**/*',
+      // Ignore the packaged application
+      'out/**/*',
+      // Ignore the circuit editor bundle: it is built, not written
+      'circuit/**/*',
     ]
   },
   // This extends the following configs:

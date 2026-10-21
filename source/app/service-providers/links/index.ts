@@ -15,14 +15,15 @@
 import { ipcMain } from 'electron'
 import broadcastIpcMessage from '@common/util/broadcast-ipc-message'
 import { extractFromFileDescriptors } from '@common/util/extract-from-file-descriptors'
-import { hasMarkdownExt } from '@common/util/file-extention-checks'
+import { hasMarkdownExt, hasIcprojExt } from '@common/util/file-extention-checks'
+import { circuitProjectStem } from '@common/util/circuit-project'
 import { getIDRE } from '@common/regular-expressions'
 import ProviderContract from '../provider-contract'
 import type LogProvider from '@providers/log'
 import path from 'path'
 import type FSAL from '../fsal'
 import type ConfigProvider from '../config'
-import type { MDFileDescriptor } from 'source/types/common/fsal'
+import type { MDFileDescriptor, CodeFileDescriptor } from 'source/types/common/fsal'
 
 /**
  * This class manages the coloured tags of the app. It reads the tags on each
@@ -122,6 +123,30 @@ export default class LinkProvider extends ProviderContract {
   }
 
   /**
+   * Finds a circuit drawing by its name.
+   *
+   * A drawing is not a Markdown file, so it has no ID. It is found by its
+   * name instead: `inv` and `inv.icproj.json` both name the drawing
+   * `inv.icproj.json`.
+   */
+  private findCircuit (query: string, descriptors: CodeFileDescriptor[]): CodeFileDescriptor|undefined {
+    const wanted = query.toLowerCase()
+
+    for (const descriptor of descriptors) {
+      if (!hasIcprojExt(descriptor.path)) {
+        continue
+      }
+      if (descriptor.name.toLowerCase() === wanted) {
+        return descriptor
+      }
+      const stem = circuitProjectStem(descriptor.name)
+      if (stem !== null && stem.toLowerCase() === wanted) {
+        return descriptor
+      }
+    }
+  }
+
+  /**
    * Retrieves a set of links to the file given as argument
    *
    * @param   {string}    sourceFilePath  The source file's path
@@ -139,10 +164,17 @@ export default class LinkProvider extends ProviderContract {
 
     const linkWithExt = path.basename(sourceFilePath)
     const linkWoExt = path.basename(sourceFilePath, path.extname(sourceFilePath))
+    // A drawing may be linked by its name without the project extension.
+    const circuitStem = circuitProjectStem(linkWithExt)
 
     // Search all recorded links
     for (const [ file, outbound ] of this._fileLinkDatabase.entries()) {
-      if (outbound.includes(id) || outbound.includes(linkWithExt) || outbound.includes(linkWoExt)) {
+      if (
+        outbound.includes(id) ||
+        outbound.includes(linkWithExt) ||
+        outbound.includes(linkWoExt) ||
+        (circuitStem !== null && outbound.includes(circuitStem))
+      ) {
         sourceFiles.push(file)
       }
     }
@@ -164,11 +196,14 @@ export default class LinkProvider extends ProviderContract {
     }
 
     const loadedDescriptors = (await this._fsal.getAllLoadedDescriptors())
-      .filter(descriptor => descriptor.type === 'file')
+    const markdownDescriptors = loadedDescriptors.filter(descriptor => descriptor.type === 'file')
+    const circuitDescriptors = loadedDescriptors.filter(descriptor => descriptor.type === 'code')
 
     const outboundLinks: string[] = []
     for (const link of dbLinks) {
-      const descriptor = await this.findExact(link, loadedDescriptors)
+      const descriptor =
+        (await this.findExact(link, markdownDescriptors)) ??
+        this.findCircuit(link, circuitDescriptors)
 
       if (descriptor !== undefined) {
         outboundLinks.push(descriptor.path)
