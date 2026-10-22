@@ -86,13 +86,13 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout Zettlr
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Enable Yarn 4.x
         # Before the Node version is chosen, so that the cache step below can
         # find a Yarn to ask about its cache folder.
         run: corepack enable
       - name: Setup NodeJS ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'yarn'
@@ -128,55 +128,55 @@ jobs:
             # built without a signature. The command is spelled out because
             # it is not one of the release scripts.
             builder: 'yarn exec electron-builder --win --x64 --publish never --prepackaged out/Zettlr-win32-x64 --config electron-builder.unsigned.yml'
-            assets: 'release/Zettlr-*.exe'
+            assets: 'zettlr/release/Zettlr-*.exe'
           - name: 'macOS (x86_64)'
             slug: 'mac-x64'
             os: macos-latest
             package: 'package:mac-x64'
             builder: 'yarn release:mac-x64'
-            assets: 'release/Zettlr-*.dmg'
+            assets: 'zettlr/release/Zettlr-*.dmg'
           - name: 'macOS (arm64)'
             slug: 'mac-arm64'
             os: macos-latest
             package: 'package:mac-arm'
             builder: 'yarn release:mac-arm'
-            assets: 'release/Zettlr-*.dmg'
+            assets: 'zettlr/release/Zettlr-*.dmg'
           - name: 'Linux (x86_64)'
             slug: 'linux-x64'
             os: ubuntu-22.04
             package: 'package:linux-x64'
             builder: 'yarn release:linux-x64'
             assets: |
-              release/Zettlr-*.AppImage
-              release/Zettlr-*.deb
-              release/Zettlr-*.rpm
+              zettlr/release/Zettlr-*.AppImage
+              zettlr/release/Zettlr-*.deb
+              zettlr/release/Zettlr-*.rpm
           - name: 'Linux (arm64)'
             slug: 'linux-arm64'
             os: ubuntu-22.04
             package: 'package:linux-arm'
             builder: 'yarn release:linux-arm'
             assets: |
-              release/Zettlr-*.AppImage
-              release/Zettlr-*.deb
-              release/Zettlr-*.rpm
+              zettlr/release/Zettlr-*.AppImage
+              zettlr/release/Zettlr-*.deb
+              zettlr/release/Zettlr-*.rpm
     steps:
       - name: Checkout Zettlr
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: zettlr
       - name: Checkout the Analog-Canvas editor
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ env.ACG_REPOSITORY }}
           ref: ${{ env.ACG_REF }}
           path: analog-canvas-go
 
       - name: Enable pnpm ${{ env.ACG_PNPM_VERSION }}
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: ${{ env.ACG_PNPM_VERSION }}
       - name: Setup NodeJS ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
@@ -205,7 +205,7 @@ jobs:
         # find a Yarn to ask about its cache folder.
         run: corepack enable
       - name: Setup NodeJS ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'yarn'
@@ -247,7 +247,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
       - name: Upload the installers
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: circuit-${{ matrix.slug }}
           path: ${{ matrix.assets }}
@@ -267,9 +267,9 @@ jobs:
       contents: write
     steps:
       - name: Checkout Zettlr
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Download the installers
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: circuit-*
           merge-multiple: true
