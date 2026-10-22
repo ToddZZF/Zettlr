@@ -1,0 +1,334 @@
+name: Circuit release
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#                                                                             #
+#              ZETTLR CIRCUIT: BUILD AND RELEASE THE INSTALLERS              #
+#                                                                             #
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
+# Zettlr Circuit is Zettlr with the Analog-Canvas editor embedded: every
+# .icproj.json opens as a note, Markdown can reference a drawing with [[]] and
+# preview it with ![[]], and a link may name a Rectangle Annotation to zoom
+# straight onto that region.
+#
+# The editor is a separate application and is not part of this repository.
+# Every build therefore checks out the Analog-Canvas repository, builds the
+# editor bundle from it, and copies that bundle into ./circuit, which
+# electron-forge then ships next to Pandoc as an extra resource.
+#
+# The five platform jobs run in parallel on native runners, so no
+# cross-compilation of the Electron application is needed. Each job uploads
+# its installers; the publish job merges them into a single release with a
+# checksum file.
+#
+# Signing is off unless the repository carries the credentials for it:
+#   * Windows uses Azure Trusted Signing (AZURE_* secrets).
+#   * macOS uses a Developer ID certificate (MACOS_CERT secrets).
+# An unsigned build is a normal, working build; only the publisher differs
+# from an official release.
+
+on:
+  # A branch push builds every installer and publishes an immutable
+  # prerelease for that exact commit.
+  push:
+    branches:
+      - feature/circuit-note-host
+    tags:
+      - 'circuit-v*'
+  workflow_dispatch:
+    inputs:
+      acg_ref:
+        description: 'Analog-Canvas branch that provides the editor bundle'
+        type: string
+        default: 'codex/zettlr-note-host'
+      publish:
+        description: 'Publish a GitHub release'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+# Only one release pipeline may run at a time; a newer commit supersedes an
+# older one that is still building.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    # Every step runs in Bash, so the five platform jobs share one shell.
+    # On the Windows runner this is Git Bash, which the packaging scripts
+    # and the Pandoc download both use anyway.
+    shell: bash
+
+env:
+  NODE_VERSION: '24'
+  ACG_PNPM_VERSION: '11.16.0'
+  # The repository that carries the editor. The editor bundle is built from
+  # it, so a release always pins the exact editor it was tested with.
+  ACG_REPOSITORY: 'ToddZZF/analog-canvas-go'
+  ACG_REF: ${{ inputs.acg_ref || 'codex/zettlr-note-host' }}
+  # The spell checker is a native module and needs a C++ toolchain. Every
+  # runner has one, so the release ships a working one.
+  ZETTLR_BUILD_SPELLCHECKER: '1'
+
+jobs:
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+  #                                                                         #
+  #                              PREFLIGHT                                  #
+  #                                                                         #
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+  # A broken type check would waste five parallel builds; it fails in minutes
+  # instead.
+  preflight:
+    name: 'Preflight'
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout Zettlr
+        uses: actions/checkout@v4
+      - name: Enable Yarn 4.x
+        # Before the Node version is chosen, so that the cache step below can
+        # find a Yarn to ask about its cache folder.
+        run: corepack enable
+      - name: Setup NodeJS ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'yarn'
+      - name: Enable Yarn 4.x for the selected Node
+        # The shims written above belong to the Node of the runner image.
+        # This puts them next to the Node the build actually uses.
+        run: corepack enable
+      - name: Set up build environment
+        run: yarn install --immutable
+      - name: Type check
+        run: yarn lint:types
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+  #                                                                         #
+  #                            PLATFORM BUILDS                              #
+  #                                                                         #
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+  build:
+    name: ${{ matrix.name }}
+    needs: [ preflight ]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # One broken platform must not hide the results of the others.
+      fail-fast: false
+      matrix:
+        include:
+          - name: 'Windows (x86_64)'
+            slug: 'win-x64'
+            os: windows-latest
+            package: 'package:win-x64'
+            # Windows signs with Azure Trusted Signing, which needs an
+            # account this repository does not have, so the installer is
+            # built without a signature.
+            builder: 'yarn electron-builder --win --x64 --publish never --prepackaged out/Zettlr-win32-x64 --config electron-builder.unsigned.yml'
+            assets: 'release/Zettlr-*.exe'
+          - name: 'macOS (x86_64)'
+            slug: 'mac-x64'
+            os: macos-latest
+            package: 'package:mac-x64'
+            builder: 'yarn release:mac-x64'
+            assets: 'release/Zettlr-*.dmg'
+          - name: 'macOS (arm64)'
+            slug: 'mac-arm64'
+            os: macos-latest
+            package: 'package:mac-arm'
+            builder: 'yarn release:mac-arm'
+            assets: 'release/Zettlr-*.dmg'
+          - name: 'Linux (x86_64)'
+            slug: 'linux-x64'
+            os: ubuntu-22.04
+            package: 'package:linux-x64'
+            builder: 'yarn release:linux-x64'
+            assets: |
+              release/Zettlr-*.AppImage
+              release/Zettlr-*.deb
+              release/Zettlr-*.rpm
+          - name: 'Linux (arm64)'
+            slug: 'linux-arm64'
+            os: ubuntu-22.04
+            package: 'package:linux-arm'
+            builder: 'yarn release:linux-arm'
+            assets: |
+              release/Zettlr-*.AppImage
+              release/Zettlr-*.deb
+              release/Zettlr-*.rpm
+    steps:
+      - name: Checkout Zettlr
+        uses: actions/checkout@v4
+        with:
+          path: zettlr
+      - name: Checkout the Analog-Canvas editor
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ACG_REPOSITORY }}
+          ref: ${{ env.ACG_REF }}
+          path: analog-canvas-go
+
+      - name: Enable pnpm ${{ env.ACG_PNPM_VERSION }}
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.ACG_PNPM_VERSION }}
+      - name: Setup NodeJS ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: analog-canvas-go/pnpm-lock.yaml
+
+      - name: Install the editor dependencies
+        working-directory: analog-canvas-go
+        run: pnpm install --frozen-lockfile
+      - name: Build the editor bundle
+        # The editor's workspace packages are consumed from their build
+        # output, so they are built before the bundle that uses them.
+        working-directory: analog-canvas-go
+        run: |
+          pnpm --filter @icm/editor^... --if-present build
+          pnpm --filter @icm/editor build:zettlr
+      - name: Copy the editor bundle into the application resources
+        # The bundle is copied, not symlinked, so that the packaged
+        # application carries it as a plain extra resource.
+        run: |
+          node analog-canvas-go/apps/editor/scripts/sync-circuit-bundle.mjs \
+            analog-canvas-go/apps/editor/dist-zettlr \
+            zettlr/circuit
+
+      - name: Enable Yarn 4.x
+        # Before the Node version is chosen, so that the cache step below can
+        # find a Yarn to ask about its cache folder.
+        run: corepack enable
+      - name: Setup NodeJS ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'yarn'
+          cache-dependency-path: zettlr/yarn.lock
+      - name: Enable Yarn 4.x for the selected Node
+        # The shims written above belong to the Node of the runner image.
+        # This puts them next to the Node the build actually uses.
+        run: corepack enable
+      - name: Set up build environment
+        working-directory: zettlr
+        run: yarn install --immutable
+
+      - name: Install the Linux cross compiler
+        if: startsWith(matrix.os, 'ubuntu')
+        # node-gyp cannot build the spell checker for a foreign
+        # architecture with the system compiler, so Zig stands in for it.
+        # (See https://andrewkelley.me/post/zig-cc-powerful-drop-in-replacement-gcc-clang.html)
+        uses: goto-bus-stop/setup-zig@v2
+      - name: Set the Linux cross compiler
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          if [ "${{ matrix.slug }}" = "linux-arm64" ]; then
+            echo "CC=zig cc -target aarch64-linux-gnu" >> "$GITHUB_ENV"
+            echo "CXX=zig c++ -target aarch64-linux-gnu" >> "$GITHUB_ENV"
+          else
+            echo "CC=zig cc -target x86_64-linux-gnu" >> "$GITHUB_ENV"
+            echo "CXX=zig c++ -target x86_64-linux-gnu" >> "$GITHUB_ENV"
+          fi
+
+      - name: Package the application
+        working-directory: zettlr
+        run: yarn ${{ matrix.package }}
+      - name: Build the installers
+        working-directory: zettlr
+        run: yarn ${{ matrix.builder }}
+        env:
+          # Without a certificate in the keychain, electron-builder must not
+          # go looking for one.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Upload the installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: circuit-${{ matrix.slug }}
+          path: ${{ matrix.assets }}
+          if-no-files-found: error
+
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+  #                                                                         #
+  #                                PUBLISH                                   #
+  #                                                                         #
+  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+  publish:
+    name: Publish the release
+    needs: [ build ]
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish }}
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Zettlr
+        uses: actions/checkout@v4
+      - name: Download the installers
+        uses: actions/download-artifact@v4
+        with:
+          pattern: circuit-*
+          merge-multiple: true
+          path: release-assets
+      - name: Name the assets after the circuit edition
+        working-directory: release-assets
+        # The installers carry the upstream product name. This fork ships the
+        # circuit edition, so the release assets say so.
+        run: |
+          for file in Zettlr-*; do
+            [ -e "$file" ] || continue
+            mv "$file" "Zettlr-Circuit-${file#Zettlr-}"
+          done
+          ls -l
+      - name: Write the checksums
+        working-directory: release-assets
+        run: sha256sum Zettlr-Circuit-* > SHA256SUMS.txt
+      - name: Determine the release tag
+        id: release
+        run: |
+          version=$(jq -r '.version' package.json)
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=circuit-v${version}-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.release.outputs.tag }}
+          PRERELEASE: ${{ steps.release.outputs.prerelease }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          version=$(jq -r '.version' package.json)
+          cat > release-notes.md <<EOF
+          Zettlr Circuit is Zettlr with the Analog-Canvas editor embedded. Every
+          .icproj.json opens as a note, Markdown can reference a drawing with
+          [[]] and preview it with ![[]], and a link may name a Rectangle
+          Annotation to zoom straight onto that region.
+
+          - Zettlr-Circuit-${version}-x64.exe -- Windows installer
+          - Zettlr-Circuit-${version}-x64.dmg / -arm64.dmg -- macOS disk image
+          - Zettlr-Circuit-${version}-x86_64.AppImage / -arm64.AppImage -- Linux
+          - Zettlr-Circuit-${version}-amd64.deb / -aarch64.deb -- Debian and Ubuntu
+          - Zettlr-Circuit-${version}-x86_64.rpm / -aarch64.rpm -- Fedora and openSUSE
+
+          SHA256SUMS.txt lists the digest of every asset. The builds are
+          unsigned unless the release notes say otherwise, so the operating
+          system marks them as coming from an unverified publisher.
+          EOF
+          printf '\nSource commit: %s\n' "$SOURCE_SHA" >> release-notes.md
+          flags=()
+          if [ "$PRERELEASE" = "true" ]; then
+            flags+=(--prerelease --latest=false)
+          fi
+          gh release create "$TAG" "${flags[@]}" \
+            release-assets/Zettlr-Circuit-* release-assets/SHA256SUMS.txt \
+            --target "$SOURCE_SHA" \
+            --title "Zettlr Circuit ${version}" \
+            --notes-file release-notes.md

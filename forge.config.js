@@ -5,6 +5,15 @@ const { FusesPlugin } = require('@electron-forge/plugin-fuses')
 const { FuseV1Options, FuseVersion } = require('@electron/fuses')
 const { getGitHash } = require('./scripts/get-git-hash.js')
 
+// The spell checker is the only native module Zettlr ships. It has no
+// prebuilt binaries and needs a C++ toolchain to compile for the runtime it
+// will be loaded into. A build on a machine without such a toolchain leaves
+// it alone, and the dictionary provider then has no dictionaries to offer.
+// A build that has the toolchain -- such as the release pipeline -- sets
+// ZETTLR_BUILD_SPELLCHECKER=1 and ships a working spell checker.
+const buildSpellChecker = process.env.ZETTLR_BUILD_SPELLCHECKER === '1'
+const ignoredNativeModules = buildSpellChecker ? [] : [ 'nodehun' ]
+
 /**
  * This function runs the get-pandoc script in order to download the requested
  * version of Pandoc. This way we can guarantee that the correct Pandoc version
@@ -203,11 +212,9 @@ module.exports = {
     // Since we must build native modules for both x64 as well as arm64, we have
     // to explicitly build it everytime for the correct architecture
     force: false, // NOTE: By now covered by the global flag on packaging.
-    // The spell checker is the only native module Zettlr ships. It has no
-    // prebuilt binaries and needs a C++ toolchain to compile, so on machines
-    // without one it is left alone; the dictionary provider then simply has
-    // no dictionaries to offer.
-    ignoreModules: [ 'nodehun' ]
+    // The spell checker is the only native module Zettlr ships, and it can only
+    // be compiled where a C++ toolchain is available.
+    ignoreModules: ignoredNativeModules
   },
   packagerConfig: {
     appBundleId: 'com.zettlr.app',
@@ -231,16 +238,21 @@ module.exports = {
     // with capital Z) we have to explicitly set executableName on the Linux
     // target.
     name: 'Zettlr',
-    // The certificate is written to the default keychain during CI build.
-    // See ./scripts/add-osx-cert.sh
-    osxSign: {
-      identity: 'Developer ID Application: Hendrik Erz (QS52BN8W68)',
-      'hardened-runtime': true,
-      'gatekeeper-assess': false,
-      entitlements: 'scripts/assets/entitlements.plist',
-      'entitlements-inherit': 'scripts/assets/entitlements.plist',
-      'signature-flags': 'library'
-    },
+    // The certificate is written to the default keychain during a signed CI
+    // build. See ./scripts/add-osx-cert.sh. A build without that certificate
+    // must not ask for it -- osx-sign fails outright when the identity is
+    // missing -- so signing is only enabled when the caller says so. An
+    // unsigned macOS build is still a working build.
+    osxSign: process.env.ZETTLR_MACOS_SIGN === '1'
+      ? {
+          identity: 'Developer ID Application: Hendrik Erz (QS52BN8W68)',
+          'hardened-runtime': true,
+          'gatekeeper-assess': false,
+          entitlements: 'scripts/assets/entitlements.plist',
+          'entitlements-inherit': 'scripts/assets/entitlements.plist',
+          'signature-flags': 'library'
+        }
+      : false,
     // Since electron-notarize 1.1.0 it will throw instead of simply print a
     // warning to the console, so we have to actively check if we should
     // notarize or not. We do so by checking for the necessary environment
@@ -270,11 +282,11 @@ module.exports = {
         mainConfig: './webpack.main.config.js',
         // The native modules are rebuilt before the bundles are built. The
         // spell checker cannot be compiled without a C++ toolchain, so it is
-        // skipped; the application runs without a spell checker rather than
-        // not at all.
+        // skipped unless the build asks for it; the application then runs
+        // without a spell checker rather than not at all.
         rebuildConfig: {
           force: false,
-          ignoreModules: [ 'nodehun' ]
+          ignoreModules: ignoredNativeModules
         },
         // Since electron-forge v6.0.0-beta.58, this property controls the CSP
         // for the development process. Since the defaults by electron-forge are

@@ -1,0 +1,13 @@
+# An unsigned build.
+#
+# The official release signs the installer with Azure Trusted Signing. A build
+# without such an account has no way to sign, so the signing step is switched
+# off here; the installer is then unsigned, which Windows marks as an
+# unverified publisher. Everything else stays the same, so the result is a
+# normal, working installer.
+#
+# Usage: yarn electron-builder --win --x64 --publish never \
+#          --prepackaged out/Zettlr-win32-x64 --config electron-builder.unsigned.yml
+extends: ./electron-builder.yml
+win:
+  azureSignOptions: null
