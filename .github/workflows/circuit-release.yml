@@ -125,8 +125,9 @@ jobs:
             package: 'package:win-x64'
             # Windows signs with Azure Trusted Signing, which needs an
             # account this repository does not have, so the installer is
-            # built without a signature.
-            builder: 'yarn electron-builder --win --x64 --publish never --prepackaged out/Zettlr-win32-x64 --config electron-builder.unsigned.yml'
+            # built without a signature. The command is spelled out because
+            # it is not one of the release scripts.
+            builder: 'yarn exec electron-builder --win --x64 --publish never --prepackaged out/Zettlr-win32-x64 --config electron-builder.unsigned.yml'
             assets: 'release/Zettlr-*.exe'
           - name: 'macOS (x86_64)'
             slug: 'mac-x64'
@@ -239,7 +240,7 @@ jobs:
         run: yarn ${{ matrix.package }}
       - name: Build the installers
         working-directory: zettlr
-        run: yarn ${{ matrix.builder }}
+        run: ${{ matrix.builder }}
         env:
           # Without a certificate in the keychain, electron-builder must not
           # go looking for one.
